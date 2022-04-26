@@ -43,7 +43,7 @@ class bot:
         
         
     def start(self):
-        for self.number, i in enumerate(self.download_list[44:]):
+        for self.number, i in enumerate(self.download_list):
             self.driver.get(f"https://www.youtube.com/results?search_query={i}")
             element = self.find(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/div/div[1]/div/h3/a")
             link = f'{element.get_attribute("href")[:19]}pi{element.get_attribute("href")[19:]}'
@@ -79,7 +79,7 @@ class bot:
             sleep(0.5)
             onlyfiles = [f for f in listdir(r"C:\Users\lotus\Downloads\temp") if isfile(join(r"C:\Users\lotus\Downloads\temp", f))]
         old_file = os.path.join(r"C:\Users\lotus\Downloads\temp", onlyfiles[0])
-        new_file = os.path.join(r"C:\Users\lotus\Downloads\temp\playlist", f"{self.number+45}. {slugify(self.song_name)}.mp3")
+        new_file = os.path.join(r"C:\Users\lotus\Downloads\temp\playlist", f"{self.number+1}. {slugify(self.song_name)}.mp3")
         os.replace(old_file, new_file)
         
         
@@ -95,4 +95,4 @@ class bot:
             for i in res["items"]:
                 self.download_list.append(f'{i["track"]["name"]} by {i["track"]["artists"][0]["name"]} lyrics')
         
-test = bot()
+v1 = bot() 
