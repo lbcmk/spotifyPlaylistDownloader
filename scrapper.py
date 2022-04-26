@@ -1,4 +1,13 @@
+"""
+Variables Section 
+
+"""
+SPOTIFY_API_KEY = ""
+SPOTIFY_PLAYLIST_ID = ""
+
+
 from selenium import webdriver
+import selenium
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
