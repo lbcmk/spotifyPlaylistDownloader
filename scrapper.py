@@ -22,34 +22,31 @@ Variables Section
 
 """
 SPOTIFY_PLAYLIST_ID = "0Hx4aQ2xTb4TKl5Z56DJh0"
-SPOTIFY_API_KEY = "BQBSHST6MibuHA4-TnTHUl5ih-lLTjBuhSzYi636ij87KFa1QJnUYM6RXCIEiZUWtZUBK8GUYTDAxMYvtPf6ZmU7LB-mR0DPFBNmnrfUGrY72Cgo5-6xA3MtKHnGUzOest5UfrUTZ3FqgWMTAaqvIZzltFsmdOfbuJmtI8i_5CrleSLfWtmi6Vw5MkK-3zhcEORXYcXC30DNSl8dmJvLpkndSJO7MEh93l3IRdE"
-
-
+SPOTIFY_API_KEY = "BQAI2L9IZ8l56h020jeFQnoSff2HNTcZhQ-a1uYCAcyrJfSFIpb6j5icKS__PEtPw_aJT2XmOB4lvOJ60oImk5f0s0TBqDgwzDwA8dlZuLap2440474tPw2l2ObNdeOsxyHD2MEvmBRD0CPk29yMIJp6nZSsT47ck8ZPaKuLF8joshfspUmKWxVDl3AZiLKwMlyl6dgoZW0oeluD3tY_6leKLrAznpQpgA-V2fU"
 
 class bot:
-    def __init__(self, key, playlist_id, n=0):
+    def __init__(self, key, playlist_id, skip_to=0):
         os.makedirs(os.path.join(os.getcwd(), "spotify/playlist"), exist_ok=True)
         self.directory = os.path.join(os.getcwd(), "spotify")
         self.download_list = [] 
         self.get_tracks(key, playlist_id)
-        options = webdriver.ChromeOptions()
+        self.options = webdriver.ChromeOptions()
         prefs = {"profile.default_content_settings.popups": 0,
              "download.default_directory": self.directory, #IMPORTANT - ENDING SLASH V IMPORTANT
              "directory_upgrade": True, 
              "profile.default_content_setting_values.notifications" : 2}
-        options.add_argument("--disable-notifications")
-        options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        options.add_experimental_option("prefs", prefs)
-        self.driver = webdriver.Chrome(options=options)
-        self.wait = WebDriverWait(self.driver, 60)
-        self.n = n
-        self.start()
+        self.options.add_argument("--disable-notifications")
+        self.options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        self.options.add_experimental_option("prefs", prefs)
+        self.n = skip_to
         
         
     def start(self):
-        for self.number, i in enumerate(self.download_list[self.n:]):
+        self.driver = webdriver.Chrome(options=self.options)
+        self.wait = WebDriverWait(self.driver, 60)
+        for self.number, self.i in enumerate(self.download_list[self.n:]):
             try:
-                self.driver.get(f"https://www.youtube.com/results?search_query={i}")
+                self.driver.get(f"https://www.youtube.com/results?search_query={self.i}")
                 element = self.find(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/div/div[1]/div/h3/a")
                 link = f'{element.get_attribute("href")[:19]}pi{element.get_attribute("href")[19:]}'
                 self.driver.get(link)
@@ -57,7 +54,7 @@ class bot:
                 self.download(link)
                 self.changename()
             except TimeoutError:
-                print(f"Can't download song #{self.number+1} - {i}")
+                print(f"Can't download song #{self.number+1} - {self.i}")
         sleep(15)
         self.driver.close()
         
@@ -67,6 +64,7 @@ class bot:
             self.wait.until(method((by, element)))
         except:
             raise TimeoutError
+
     
     
     def download(self, link):
@@ -104,5 +102,6 @@ class bot:
             for i in res["items"]:
                 self.download_list.append(f'{i["track"]["name"]} by {i["track"]["artists"][0]["name"]} lyrics')
         
-        
-v1 = bot(SPOTIFY_API_KEY, SPOTIFY_PLAYLIST_ID) 
+if __name__ == "__main__":
+    v1 = bot(SPOTIFY_API_KEY, SPOTIFY_PLAYLIST_ID, skip_to=0) 
+    v1.start()
