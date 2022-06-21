@@ -9,27 +9,32 @@ import os
 from time import sleep
 from os import listdir
 from os.path import isfile, join
-from selenium.webdriver.support.ui import WebDriverWait
-import os 
+from selenium.webdriver.support.ui import WebDriverWait 
 from dotenv import load_dotenv
 import requests 
 from slugify import slugify
 load_dotenv()
 
+import json
+from yt_dlp import YoutubeDL
+from mutagen.easyid3 import EasyID3
+from os.path import exists
 
 """
-Variables Section 
-
+Variables Section
 """
 SPOTIFY_PLAYLIST_ID = "0Hx4aQ2xTb4TKl5Z56DJh0"
-SPOTIFY_API_KEY = "BQAI2L9IZ8l56h020jeFQnoSff2HNTcZhQ-a1uYCAcyrJfSFIpb6j5icKS__PEtPw_aJT2XmOB4lvOJ60oImk5f0s0TBqDgwzDwA8dlZuLap2440474tPw2l2ObNdeOsxyHD2MEvmBRD0CPk29yMIJp6nZSsT47ck8ZPaKuLF8joshfspUmKWxVDl3AZiLKwMlyl6dgoZW0oeluD3tY_6leKLrAznpQpgA-V2fU"
+SPOTIFY_API_KEY = "token" # https://developer.spotify.com/documentation/web-playback-sdk/quick-start/
+SPOTIFY_MARKET_LOCATION = "CA" # https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Decoding_table
 
 class bot:
-    def __init__(self, key, playlist_id, skip_to=0):
-        os.makedirs(os.path.join(os.getcwd(), "spotify/playlist"), exist_ok=True)
+    def __init__(self, key, playlist_id, market, skip_to=0):
+        os.makedirs(os.path.join(os.getcwd(), f"spotify/{SPOTIFY_PLAYLIST_ID}"), exist_ok=True)
         self.directory = os.path.join(os.getcwd(), "spotify")
-        self.download_list = [] 
-        self.get_tracks(key, playlist_id)
+        self.download_list = []
+        self.trackdatafull = []
+        self.trackdata = []
+        self.get_tracks(key, playlist_id, market)
         self.options = webdriver.ChromeOptions()
         prefs = {"profile.default_content_settings.popups": 0,
              "download.default_directory": self.directory, #IMPORTANT - ENDING SLASH V IMPORTANT
@@ -41,42 +46,103 @@ class bot:
         self.n = skip_to
         
         
-    def start(self):
-        self.driver = webdriver.Chrome(options=self.options)
-        self.wait = WebDriverWait(self.driver, 60)
-        for self.number, self.i in enumerate(self.download_list[self.n:]):
-            try:
-                self.driver.get(f"https://www.youtube.com/results?search_query={self.i}")
-                element = self.find(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/div/div[1]/div/h3/a")
-                link = f'{element.get_attribute("href")[:19]}pi{element.get_attribute("href")[19:]}'
-                self.driver.get(link)
-                self.song_name = self.find(By.XPATH, "/html/body/section[1]/div/div[2]/div[2]/div/div[1]/div/div[2]/b").text.split("\n")[0]
-                self.download(link)
-                self.changename()
-            except TimeoutError:
-                print(f"Can't download song #{self.number+1} - {self.i}")
-        sleep(15)
-        self.driver.close()
+    def start(self, id):
+        if(len(self.download_list) > 0):   
+            self.driver = webdriver.Chrome(options=self.options)
+            self.wait = WebDriverWait(self.driver, 60)
+            data = self.trackdata
+            for self.number, self.i in enumerate(self.download_list[self.n:]):
+                try:
+                    if(self.i[0] == "#"):
+                        self.i = self.i.replace("#", "", 1) # removes the hash from the start of a string to make sure it doesn't search youtube as a hashtag
+
+                    self.driver.get(f"https://www.youtube.com/results?search_query={self.i}")
+                    element = self.find(By.XPATH, "/html/body/ytd-app/div[1]/ytd-page-manager/ytd-search/div[1]/ytd-two-column-search-results-renderer/div/ytd-section-list-renderer/div[2]/ytd-item-section-renderer/div[3]/ytd-video-renderer[1]/div[1]/div/div[1]/div/h3/a")
+                    link = f'{element.get_attribute("href")}'
+                    self.driver.get(link);
+                    
+                    data[self.number]["track"]["video_url"] = link
+                    self.trackdatafull.append(data[self.number])
+                    
+                except TimeoutError:
+                    print(f"Can't download song #{self.number+1} - {self.i}")
+            sleep(2)
+            self.trackdata = data
+            f = open(f"spotify/{id}/playlist.json", "w")
+            f.truncate(0)
+            json.dump(self.trackdatafull, f, sort_keys=True, indent='\t', separators=(',', ': '))
+            f.close()
+            self.driver.close()
+        else:
+            print("No new songs to download")
+        
+        self.download(id)
         
     
+    def download(self, id):
+        f = open(f"spotify/{id}/playlist.json", "r")
+        playlist_json = json.load(f)
+        f.close()
+
+        for i in playlist_json: # loops for every song in the playlist.json file
+            title, first_artist = i["track"]["name"], i["track"]["artists"][0]["name"]
+            while(title[-1] in '"!@#$%^&*()-+?_=,<>/"'): # removes speacial characters from the name to make sure it doesn't create unwanted behaviour in file managers
+                    title = title[:-1]
+            if(len(first_artist) > 0):            
+                while(first_artist[0] in '"!@#$%^&*()-+?_=,<>/'):
+                    first_artist = first_artist[1:]
+            for k in '#"/\*|:?><':
+                title = title.replace(k, '')
+                first_artist = first_artist.replace(k, '')
+
+            filePath = f"spotify/{id}/songs/{first_artist} - {title}.mp3"
+
+            if(exists(filePath)):
+                continue; # skips if the file already exists
+            if(not "video_url" in i["track"]):
+                continue; # if there is no video url in the json element then it skips it
+
+            video_info = YoutubeDL().extract_info(
+                url=str(i["track"]["video_url"]), download=False
+            )
+
+            options = {
+                'format':'bestaudio/best',
+                'extractaudio':True,
+                'audioformat':'mp3',
+                'outtmpl':filePath,
+                'noplaylist':True,
+                'nocheckcertificate':True,
+                'proxy':"",
+                'addmetadata':True,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            }
+
+            with YoutubeDL(options) as ydl:
+                ydl.download([video_info['webpage_url']])
+
+
+            song = EasyID3(filePath)
+            song['title'] = str(i["track"]["name"])
+            song['album'] = str(i["track"]["album"]["name"])
+            artists = []
+            for j in i["track"]["artists"]:
+                artists.append(j.get("name"))
+            song['artist'] = artists
+            song["tracknumber"] = str(i["track"]["track_number"])
+            
+            song.save()
+            
+
     def waiting(self, by, element, method):
         try:
             self.wait.until(method((by, element)))
         except:
             raise TimeoutError
-
-    
-    
-    def download(self, link):
-        self.driver.get(link) # get download link 
-        self.find(By.XPATH, "/html/body/section[1]/div/div[2]/div[2]/div/div[2]/div/div[1]/button[2]", EC.element_to_be_clickable).click() # click Audio btn 
-        self.find(By.XPATH, "/html/body/section[1]/div/div[2]/div[2]/div/div[2]/div/div[3]/table/tbody/tr[2]/td[3]/button", EC.element_to_be_clickable).click() # click convert btn 
-        self.find(By.XPATH, "/html/body/section[1]/div/div[2]/div[2]/div/div[2]/div/div[3]/table/tbody/tr[2]/td[3]/button/a", EC.element_to_be_clickable).click() # download
-        windows = self.driver.window_handles
-        self.driver.switch_to.window(windows[1])
-        self.driver.close()
-        self.driver.switch_to.window(windows[0])
-        
         
     def changename(self):
         sleep(1)
@@ -95,13 +161,46 @@ class bot:
         return self.driver.find_element(by, element)
     
     
-    def get_tracks(self, key, id):
-        self.total = requests.get(f"https://api.spotify.com/v1/playlists/{id}/tracks?market=CA&fields=total", headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}).json()['total']        
-        for n in range(divmod(self.total, 100)[0] + 1):
-            res = requests.get(f"https://api.spotify.com/v1/playlists/{id}/tracks?market=CA&fields=items(track.name%2Ctrack.artists.name)&offset={n*100}", headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}).json()    
-            for i in res["items"]:
-                self.download_list.append(f'{i["track"]["name"]} by {i["track"]["artists"][0]["name"]} lyrics')
+    def get_tracks(self, key, id, market):
+        self.total = requests.get(f"https://api.spotify.com/v1/playlists/{id}/tracks?market={market}&fields=total", headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}).json()['total']        
         
+        if not exists(f"spotify/{id}/playlist.json"):
+            with open(f"spotify/{id}/playlist.json", 'w'): pass
+
+        f = open(f"spotify/{id}/playlist.json", "r")
+        if(os.stat(f.name).st_size == 0):
+            f.close()
+            f = open(f"spotify/{id}/playlist.json", "w")
+            f.write("[]")
+            f.close()
+            f = open(f"spotify/{id}/playlist.json", "r")
+        data = json.load(f)
+        f.close()
+
+        self.trackdatafull = data;
+
+        for n in range(divmod(self.total, 100)[0] + 1):
+            res = requests.get(f"https://api.spotify.com/v1/playlists/{id}/tracks?market={market}&fields=items(track.name%2Ctrack.artists.name),items.track.album.images,items.track.track_number,items.track.album.name,items.track.id,items.track.duration_ms&offset={n*100}", headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}).json()
+            for i in res["items"]:
+                if("is_local" in i["track"]):
+                    if(i["track"]["is_local"] == True):
+                        continue; #skips local files
+                skip = False;      
+                for dict in data:
+                    if (dict["track"]["id"] == i["track"]["id"] and "video_url" in dict["track"]):
+                        skip = True;
+                title, first_artist = i["track"]["name"], i["track"]["artists"][0]["name"]
+                while(title[-1] in '"!@#$%^&*()-+?_=,<>/"'): # removes speacial characters from the name to make sure it doesn't create unwanted behaviour in file managers
+                    title = title[:-1]
+                if(len(first_artist) > 0):            
+                    while(first_artist[0] in '"!@#$%^&*()-+?_=,<>/'):
+                        first_artist = first_artist[1:]
+                    
+                if(skip == False):
+                    self.download_list.append(f'{title} by {first_artist} (official audio)')
+                    self.trackdata.append(i)
+        
+
 if __name__ == "__main__":
-    v1 = bot(SPOTIFY_API_KEY, SPOTIFY_PLAYLIST_ID, skip_to=0) 
-    v1.start()
+    v1 = bot(SPOTIFY_API_KEY, SPOTIFY_PLAYLIST_ID, SPOTIFY_MARKET_LOCATION, skip_to=0) 
+    v1.start(SPOTIFY_PLAYLIST_ID)

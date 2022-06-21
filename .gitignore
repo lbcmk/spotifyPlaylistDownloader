@@ -1,4 +1,6 @@
 .env 
 /venv 
 /spotify
-test.py
+/test
+chromedriver.*
+ffmpeg.*
