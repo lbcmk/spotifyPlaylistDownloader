@@ -24,7 +24,7 @@ SPOTIFY_PLAYLIST_ID = "Playlist ID"
 SPOTIFY_API_KEY = "token"
 SPOTIFY_MARKET_LOCATION = "CA"
 ```
-##### ([Click here]("ID_INSTRUCTIONS.md") or go to <code>ID_INSTRUCTIONS.md</code> for help on getting id's.) <br>
+##### ([Click here](ID_INSTRUCTIONS.md) or go to <code>ID_INSTRUCTIONS.md</code> for help on getting id's.) <br>
 Run the script by typing <code>python scrapper.py</code> in the terminal
 
 ## Built Using:
