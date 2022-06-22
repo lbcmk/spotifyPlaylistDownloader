@@ -18,13 +18,16 @@ load_dotenv()
 import json
 from yt_dlp import YoutubeDL
 from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3, APIC
 from os.path import exists
+from io import BytesIO
 
 """
 Variables Section
 """
-SPOTIFY_PLAYLIST_ID = "0Hx4aQ2xTb4TKl5Z56DJh0"
-SPOTIFY_API_KEY = "token" # https://developer.spotify.com/documentation/web-playback-sdk/quick-start/
+# SPOTIFY_PLAYLIST_ID = "0Hx4aQ2xTb4TKl5Z56DJh0"
+SPOTIFY_PLAYLIST_ID = "0MtgkXtM5VQ6eG83kAXobC"
+SPOTIFY_API_KEY = "BQCRsHHI7g-CT8maXVK8v5gZ6oGKR_D2_dPfKhvatMC0PU-Mm2f01l36mXL1fwC1e13rTorP49OnP0oG3552Oq_d4BYCkybUJXH4GzWlTiwHcyV0qj5gyRaNcIifckcMn-nQCnbLTQAVwNksTKYTZsaEC_b_bK9R8iUjgnOBR9KlLRDF6rAAkYUQnOApv7aOu4wAUQCSSjKs" # https://developer.spotify.com/documentation/web-playback-sdk/quick-start/
 SPOTIFY_MARKET_LOCATION = "CA" # https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Decoding_table
 
 class bot:
@@ -135,6 +138,20 @@ class bot:
             song['artist'] = artists
             song["tracknumber"] = str(i["track"]["track_number"])
             
+            song.save()
+
+            song = ID3(filePath)
+
+            response = requests.get(i["track"]["album"]["images"][0]["url"])
+            img = BytesIO(response.content)
+
+            song['APIC'] = APIC(
+                      encoding=3,
+                      mime='image/jpeg',
+                      type=3, desc=u'Cover',
+                      data=img.getvalue()
+                    )
+                        
             song.save()
             
 
