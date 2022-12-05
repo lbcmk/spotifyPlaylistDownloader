@@ -22,6 +22,9 @@ from mutagen.id3 import ID3, APIC
 from os.path import exists
 from io import BytesIO
 
+from shutil import which
+from pathlib import Path
+
 """
 Variables Section
 """
@@ -49,8 +52,17 @@ class bot:
         
         
     def start(self, id):
-        if(len(self.download_list) > 0):   
-            self.driver = webdriver.Chrome(options=self.options)
+        if(len(self.download_list) > 0):
+            if(which("chromedriver") is not None):
+                chromedriver = which("chromedriver")
+            else:
+                try:
+                    chromedriver = './' + str(next(Path(".").glob('chromedriver*')))
+                except StopIteration:
+                    print("chromedriver executable is not downloaded")
+                    return 0;
+            
+            self.driver = webdriver.Chrome(options=self.options, executable_path=chromedriver)
             self.wait = WebDriverWait(self.driver, 60)
             data = self.trackdata
             for self.number, self.i in enumerate(self.download_list[self.n:]):
