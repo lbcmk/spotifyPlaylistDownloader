@@ -16,6 +16,7 @@ from slugify import slugify
 load_dotenv()
 
 import json
+from selenium.webdriver.chrome.service import Service
 from yt_dlp import YoutubeDL
 from mutagen.easyid3 import EasyID3
 from mutagen.id3 import ID3, APIC
@@ -30,7 +31,7 @@ Variables Section
 """
 SPOTIFY_PLAYLIST_ID = "Playlist ID"
 SPOTIFY_API_KEY = "token" # https://developer.spotify.com/documentation/web-playback-sdk/quick-start/
-SPOTIFY_MARKET_LOCATION = "CA" # https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Decoding_table
+SPOTIFY_MARKET_LOCATION = "XX" # https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2#Decoding_table
 
 class bot:
     def __init__(self, key, playlist_id, market, skip_to=0):
@@ -39,6 +40,7 @@ class bot:
         self.download_list = []
         self.trackdatafull = []
         self.trackdata = []
+        self.removeFromString = "\"!@#$%^*()-+?_=.,<>/\'\\"
         self.get_tracks(key, playlist_id, market)
         self.options = webdriver.ChromeOptions()
         prefs = {"profile.default_content_settings.popups": 0,
@@ -53,7 +55,7 @@ class bot:
         
     def start(self, id):
         if(len(self.download_list) > 0):
-            if(which("chromedriver") is not None):
+            if(which("chromedriver") is not None): # Checks for chromedriver environment variable
                 chromedriver = which("chromedriver")
             else:
                 try:
@@ -62,7 +64,7 @@ class bot:
                     print("chromedriver executable is not downloaded")
                     return 0;
             
-            self.driver = webdriver.Chrome(options=self.options, executable_path=chromedriver)
+            self.driver = webdriver.Chrome(options=self.options, service=Service(chromedriver))
             self.wait = WebDriverWait(self.driver, 60)
             data = self.trackdata
             for self.number, self.i in enumerate(self.download_list[self.n:]):
@@ -100,18 +102,21 @@ class bot:
 
         for i in playlist_json: # loops for every song in the playlist.json file
             title, first_artist = i["track"]["name"], i["track"]["artists"][0]["name"]
-            while(title[-1] in '"!@#$%^&*()-+?_=,<>/"'): # removes speacial characters from the name to make sure it doesn't create unwanted behaviour in file managers
-                    title = title[:-1]
-            if(len(first_artist) > 0):            
-                while(first_artist[0] in '"!@#$%^&*()-+?_=,<>/'):
-                    first_artist = first_artist[1:]
-            for k in '#"/\*|:?><':
-                title = title.replace(k, '')
-                first_artist = first_artist.replace(k, '')
+            if(len(title) > 1 and title[-1] in self.removeFromString): # removes special characters from the name to make sure it doesn't create unwanted behaviour in file managers
+                title = title + "&"
+            if(len(first_artist) > 1 and first_artist[0] in self.removeFromString):
+                first_artist = "&" + first_artist
+            for k in '#"/\\*|:?><':
+                title = title.replace(k, '&')
+                first_artist = first_artist.replace(k, '&')
 
-            filePath = f"spotify/{id}/songs/{first_artist} - {title}.mp3"
+            folderPath = f"spotify/{id}/songs/"
+            fileName = f"{first_artist} - {title}"
+            fileExtension = "mp3"
 
-            if(exists(filePath)):
+            filePath = folderPath + fileName
+
+            if(exists(filePath + '.' + fileExtension)):
                 continue; # skips if the file already exists
             if(not "video_url" in i["track"]):
                 continue; # if there is no video url in the json element then it skips it
@@ -139,8 +144,7 @@ class bot:
             with YoutubeDL(options) as ydl:
                 ydl.download([video_info['webpage_url']])
 
-
-            song = EasyID3(filePath)
+            song = EasyID3(filePath + '.' + fileExtension)
             song['title'] = str(i["track"]["name"])
             song['album'] = str(i["track"]["album"]["name"])
             artists = []
@@ -151,7 +155,7 @@ class bot:
             
             song.save()
 
-            song = ID3(filePath)
+            song = ID3(filePath + '.' + fileExtension)
 
             response = requests.get(i["track"]["album"]["images"][0]["url"])
             img = BytesIO(response.content)
@@ -218,12 +222,11 @@ class bot:
                     if (dict["track"]["id"] == i["track"]["id"] and "video_url" in dict["track"]):
                         skip = True;
                 title, first_artist = i["track"]["name"], i["track"]["artists"][0]["name"]
-                while(title[-1] in '"!@#$%^&*()-+?_=,<>/"'): # removes speacial characters from the name to make sure it doesn't create unwanted behaviour in file managers
-                    title = title[:-1]
-                if(len(first_artist) > 0):            
-                    while(first_artist[0] in '"!@#$%^&*()-+?_=,<>/'):
-                        first_artist = first_artist[1:]
-                    
+                if(len(title) > 1 and title[-1] in self.removeFromString): # removes special characters from the name to make sure it doesn't create unwanted behaviour in file managers
+                    title = title + "&"
+                if(len(first_artist) > 1 and first_artist[0] in self.removeFromString):
+                    first_artist = "&" + first_artist
+
                 if(skip == False):
                     self.download_list.append(f'{title} by {first_artist} (official audio)')
                     self.trackdata.append(i)
